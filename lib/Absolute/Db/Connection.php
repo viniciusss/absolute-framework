@@ -2,8 +2,6 @@
 
 namespace Absolute\Db;
 
-use Adapter;
-
 class Connection {
 
 	/**
@@ -18,8 +16,22 @@ class Connection {
 	*/
 	private $_adapter;
 
-	public function __construct(Adapter $adapter) {
+	/**
+	* The query builder of the connection
+	* @var Absolute\Db\QueryBuilder
+	*/
+	private $_queryBuilder;
+
+	private static $_defaultQueryBuilder = 'Sql';
+
+	public function __construct(Adapter $adapter, QueryBuilder $queryBuilder = null) {
 		$this->_adapter = $adapter;
+
+		if( is_null( $queryBuilder ) ){
+			$queryBuilder = QueryBuilder::factory(self::$_defaultQueryBuilder);
+		}
+
+		$this->_queryBuilder = $queryBuilder;
 	}
 
 	/**
@@ -27,21 +39,11 @@ class Connection {
 	* @param string $table The table name
 	* @param array $data The cols to be inserted
 	* @return int inserted id
-	* @throws \RunTimeException When a param is empty
+	* @throws Absolute\Db\QueryBuilder\Exception When a param is empty
 	*/
 	public function insert($table, array $data) {
-		if( empty($table) )
-			throw new \RunTimeException("The table cant not be empty.");
-
-		if( empty( $data ) )
-			throw new \RunTimeException("The data cant not be empty.");
-
-		$query = " INSERT INTO " . $this->getAdapter()->getDatabase() . "." . $table . " SET " ;
-
-		foreach( $data as $col => $val )
-			$query .= " `{$col}` = '{$val}', ";
-
-		$query = substr( $query, 0, -2 );
+		
+		$query = $this->getQueryBuilder()->makeInsert($table, $data);
 
 		$this->getAdapter()->execute($query);
 
@@ -53,37 +55,58 @@ class Connection {
 	* @param string $table The table name
 	* @param array $keys Primaries keys from table
 	* @param array $data The cols to be updated
-	* @throws \RunTimeException When a param is empty
+	* @throws Absolute\Db\QueryBuilder\Exception When a param is empty
 	*/
 	public function update($table, array $keys, array $data) {
-		if( empty($table) )
-			throw new \RunTimeException("The table cant not be empty.");
-
-		if( empty( $keys ) )
-			throw new \RunTimeException("The keys cant not be empty.");
-
-		if( empty( $data ) )
-			throw new \RunTimeException("The data cant not be empty.");
-
-		$query = "UPDATE " . $this->getAdapter()->getDatabase() . "." . $table . " SET " ;
-
-		foreach( $data as $col => $val )
-			$query .= " `{$col}` = '{$val}', ";
-
-		$query = substr( $query, 0, -2 );
-
-		$query .= " WHERE ";
-
-		foreach($keys as $col => $val){
-			$query .= " `{$col}` = '{$val}' AND ";
-		}
-
-		$query = substr( $query, 0, -4 );
-
-
+		$query = $this->getQueryBuilder()->makeUpdate($table, $keys, $data);
 		$this->getAdapter()->execute($query);
 	}
 
+	/**
+	* DELETE a row in a table
+	* @param string $table The table name
+	* @param array $keys Primaries keys from table
+	* @throws Absolute\Db\QueryBuilder\Exception When a param is empty
+	*/
+	public function delete($table, array $keys) {
+		$query = $this->getQueryBuilder()->makeDelete($table, $keys);
+		$this->getAdapter()->execute($query);
+	}
+
+	public function rollBack() {
+		$this->getAdapter()->rollBack();
+	}
+
+	public function commit() {
+		$this->getAdapter()->commit();
+	}
+
+	public function startTransaction() {
+		$this->getAdapter()->startTransaction();
+	}
+
+	/**
+	* @return Absolute\Db\QueryBuilder
+	*/
+	public function getQueryBuilder() {
+		return $this->_queryBuilder;
+	}
+
+	public function getAdapter() {
+		return $this->_adapter;
+	}
+
+	public static function getConnection($name, Adapter $adapter = null, QueryBuilder $queryBuilder = null) {
+		if( isset( self::$_connections[$name] ) )
+			return self::$_connections[$name];
+
+		if( is_null($adapter) )
+			throw new \RunTimeException("The apdater cant not be empty.");
+
+		self::$_connections[$name] = new Connection($adapter, $queryBuilder);
+
+		return self::$_connections[$name];
+	}
 }
 
 
