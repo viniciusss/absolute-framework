@@ -120,7 +120,6 @@ class SplClassLoader
 	 */
 	public function loadClass($className)
 	{
-		echo $className . "\n";
 		if (null === $this->_namespace || $this->_namespace.$this->_namespaceSeparator === substr($className, 0, strlen($this->_namespace.$this->_namespaceSeparator))) {
 			$fileName = '';
 			$namespace = '';
